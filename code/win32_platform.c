@@ -1,28 +1,44 @@
-#include "utils.c"
-#include "math.c"
+/*
+WIN32 PLATFORM LAYER
 
+Contains everything needed to run the game in windows
+Creates a window
+Checks for interupts
+Updates the window
+
+
+*/
+
+#include "utils.c"
+#include <stdlib.h>
+#include <stdio.h>
+#include <time.h>
+#include "maths.c"
 #include "platform_common.c"
+#include "collision.c"
 
 #include <windows.h>
 
+
+
 struct {
-    // Platform non-specific part
+    // platform non-specific part
     int width, height;
     u32 *pixels;
     
-    // Platform specific part
+    // platform specific part
     BITMAPINFO bitmap_info;
-    
 } typedef Render_Buffer;
 
-global_varible Render_Buffer render_buffer;
+global_variable Render_Buffer render_buffer;
 
 #include "software_rendering.c"
 #include "game.c"
 
 internal LRESULT
-window_callback (HWND window, UINT message, WPARAM w_param, LPARAM l_param
-                 ) {
+window_callback  (HWND window, UINT message, WPARAM w_param,
+                  LPARAM l_param
+                  ) {
     
     LRESULT result = 0;
     
@@ -33,25 +49,32 @@ window_callback (HWND window, UINT message, WPARAM w_param, LPARAM l_param
         } break;
         
         case WM_SIZE: {
+            // Get window params from window manager
             RECT rect;
             GetWindowRect(window, &rect);
             render_buffer.width = rect.right - rect.left;
             render_buffer.height = rect.bottom - rect.top;
             
             if (render_buffer.pixels) {
+                // free to be reallocated
                 VirtualFree(render_buffer.pixels, 0, MEM_RELEASE);
             }
             
-            render_buffer.pixels = VirtualAlloc(0, sizeof(u32)*render_buffer.width*render_buffer.height,
-                                                MEM_COMMIT|MEM_RESERVE, PAGE_READWRITE);
+            render_buffer.pixels = VirtualAlloc(0, sizeof(u32)*render_buffer.width*render_buffer.height, MEM_COMMIT|MEM_RESERVE, PAGE_READWRITE);
             
-            //fill the bitmapinfo
+            //fill the bitmapinfo struct
+            
             render_buffer.bitmap_info.bmiHeader.biSize = sizeof(render_buffer.bitmap_info.bmiHeader);
             render_buffer.bitmap_info.bmiHeader.biWidth = render_buffer.width;
             render_buffer.bitmap_info.bmiHeader.biHeight = render_buffer.height;
             render_buffer.bitmap_info.bmiHeader.biPlanes = 1;
             render_buffer.bitmap_info.bmiHeader.biBitCount = 32;
             render_buffer.bitmap_info.bmiHeader.biCompression = BI_RGB;
+            
+            // Allocate buffer
+            
+            //Fill Bitmao INfo
+            
         } break;
         
         default: {
@@ -62,54 +85,63 @@ window_callback (HWND window, UINT message, WPARAM w_param, LPARAM l_param
     return result;
 }
 
+// Windows main
 int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
             LPSTR lpCmdLine, int nShowCmd) {
     
-    WNDCLASSA window_class = {0};
-    window_class.style = CS_HREDRAW|CS_VREDRAW;
-    window_class.lpfnWndProc = window_callback;
+    WNDCLASSA window_class = {0}; // Create a window class and initialise it to 0
+    window_class.style = CS_HREDRAW|CS_VREDRAW; // Redraw the horistonal and vertical
+    window_class.lpfnWndProc = window_callback; // Create a proceedure
     window_class.lpszClassName = "Game_Window_Class";
     
-    RegisterClassA(&window_class);
     
-    HWND window = CreateWindowExA(0, window_class.lpszClassName, "Breakout", WS_VISIBLE|WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, 1280, 720, 0, 0, 0, 0);
+    RegisterClassA(&window_class);  // Register/pass the  window class
+    
+    HWND window =
+        CreateWindowExA(0, window_class.lpszClassName, "Breakout",
+                        WS_VISIBLE|WS_OVERLAPPEDWINDOW, CW_USEDEFAULT,
+                        CW_USEDEFAULT, 1280, 720, 0, 0 , 0, 0);
+    
     HDC hdc = GetDC(window);
     
     Input input = {0};
     
     LARGE_INTEGER last_counter;
     QueryPerformanceCounter(&last_counter);
+    f32 last_dt = 0.016667;
     
-    LARGE_INTEGER frequency_counter_large;
-    QueryPerformanceFrequency(&frequency_counter_large);
-    f32 frequency_counter = (f32)frequency_counter_large.QuadPart;
+    LARGE_INTEGER cpu_freq_int;
+    QueryPerformanceFrequency(&cpu_freq_int);
+    f32 cpu_freq = (f32)cpu_freq_int.QuadPart;
     
-    f32 last_dt = 0.01666f;
+    srand( (unsigned)time( NULL ) );
     
     while (running) {
         //Input
         
-        for (int i = 0; i < BUTTON_COUNT; i++) input.buttons[i].changed = false;
+        for (int i = 0 ; i < BUTTON_COUNT; i++) input.buttons[i].changed = false;
         
         MSG message;
-        while (PeekMessageA(&message, window, 0, 0, PM_REMOVE)) {
+        while (PeekMessageA(&message,window,  0, 0, PM_REMOVE)){
             
             switch(message.message) {
                 
+                // Check for key presses
                 case WM_SYSKEYDOWN:
                 case WM_SYSKEYUP:
                 case WM_KEYDOWN:
                 case WM_KEYUP: {
                     
+                    // State Changes
                     u32 vk_code = (u32)message.wParam;
                     b32 was_down = ((message.lParam & (1 << 30)) != 0);
-                    b32 is_down  = ((message.lParam & (1 << 31)) == 0);
+                    b32 is_down = ((message.lParam & (1 << 31)) == 0);
                     
 #define process_button(vk, b) \
-                    if (vk_code == vk) {\
-                        input.buttons[b].changed = is_down != input.buttons[b].is_down;\
-                        input.buttons[b].is_down = is_down;\
-                    }
+if (vk_code == vk) {\
+input.buttons[b].changed = is_down != input.buttons[b].is_down;\
+input.buttons[b].is_down = is_down;\
+}
                     
                     process_button(VK_LEFT, BUTTON_LEFT);
                     process_button(VK_RIGHT, BUTTON_RIGHT);
@@ -120,28 +152,42 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
                 } break;
                 
                 default: {
-                    TranslateMessage(&message); 
+                    TranslateMessage(&message);
                     DispatchMessage(&message);
                 }
             }
-            
         }
         
+        POINT mouse_pointer;
+        GetCursorPos(&mouse_pointer);
+        ScreenToClient(window, &mouse_pointer);
+        
+        input.mouse.x = mouse_pointer.x;
+        input.mouse.y = render_buffer.height-mouse_pointer.y;
+        
         //Simulation
-        simulate_game(&input, last_dt);
+        
+        simulate_game(&input, last_dt, cpu_freq);
+        
         
         //Render
         StretchDIBits(hdc, 0, 0, render_buffer.width, render_buffer.height, 0, 0, render_buffer.width, render_buffer.height, render_buffer.pixels, &render_buffer.bitmap_info, DIB_RGB_COLORS, SRCCOPY);
         
         
-        //Get the frame time
+        // DRAW THE FRAME RATE
+        char framerate[100];
+        RECT textbox = {20, 10, 20, 10};
+        sprintf(framerate, "%5.0f", 1/last_dt );
+        DrawText(hdc, framerate, -1, &textbox, DT_CENTER|DT_NOCLIP);
+        
+        
+        //Get the frame time cpu counts since last frame
         LARGE_INTEGER current_counter;
         QueryPerformanceCounter(&current_counter);
         
-        last_dt = (f32)(current_counter.QuadPart - last_counter.QuadPart) / frequency_counter;
+        last_dt = (f32)(current_counter.QuadPart - last_counter.QuadPart) / cpu_freq;
         
         last_counter = current_counter;
         
     }
-    
 }

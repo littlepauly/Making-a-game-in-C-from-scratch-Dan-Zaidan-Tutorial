@@ -1,4 +1,8 @@
+/*
+Definitions and utilities.
 
+Seperate out platform indpendent code from the windows specific file
+*/
 #include <stdint.h>
 
 typedef int8_t s8;
@@ -21,7 +25,7 @@ typedef int b32;
 #define true 1
 #define false 0
 
-#define global_varible static
+#define global_variable static
 #define internal static
 
-global_varible b32 running = true;
+global_variable b32 running = true;

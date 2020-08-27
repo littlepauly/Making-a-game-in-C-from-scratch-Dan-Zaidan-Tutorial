@@ -1,6 +1,11 @@
+/*
+PLATFORM COMMON
+*/
+
 struct {
     b32 is_down;
     b32 changed;
+    
 } typedef Button;
 
 enum {
@@ -13,13 +18,15 @@ enum {
 };
 
 struct {
-    int mouse_x;
-    int mouse_y;
     
+    v2i mouse;
     Button buttons[BUTTON_COUNT];
     
 } typedef Input;
 
+
+
+// Define input states
 #define pressed(b) (input->buttons[b].is_down && input->buttons[b].changed)
 #define released(b) (!input->buttons[b].is_down && input->buttons[b].changed)
 #define is_down(b) (input->buttons[b].is_down)
